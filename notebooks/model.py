@@ -1,3 +1,5 @@
+
+import time
 from enum import Enum
 from typing import Any, Optional
 
@@ -130,6 +132,8 @@ class Technology:
             self.social_impact_level = fields.get('social_impact_level')
             self.social_impact_potential = fields.get('social_impact_potential')
             self.social_impact_potential_level = fields.get('social_impact_potential_level')
+            self.type = fields.get('type')
+            self.spi_impact = fields.get('spi_impact')
 
 
     
@@ -166,37 +170,59 @@ pessimist = Agent(AgentInfo.pessimist)
 social_benefits = Agent(AgentInfo.social_benefits)
 
 for record in records:
+    start_time = time.time()
     tech = record.technology
     if tech.author is None:
         (summary, impact, author, opinion) = summarize(tech, summarizer=summarizer, cleaner=cleaner)
         response = table.update(record.id, {'summary': summary, 'impact': impact, 'author': author, 'opinion': opinion})
-        print(response)
     elif tech.author.startswith('AUTHOR:'):
         author = tech.author[7:].strip()
         response = table.update(record.id, {'author': author})
-        print(response)
 
     if tech.impact_level is None:
         impact_level = tech.fulfillment(general)
         response = table.update(record.id, {'impact_level': impact_level})
-        print(response)
 
-    # if tech.optimist is None:
-    #     optimist_response = optimist.run(f'''Given the following description of the technology "{tech.name}" and its impact since the year {tech.year}, provide your opinion on the technology and its impact. Do not provide any other commentary. Here is the description to use for your opinion: "{tech.blurb}"''')
-    #     response = table.update(record.id, {'optimist': optimist_response})
-    #     print(response)
+    if tech.optimist is None:
+        optimist_response = optimist.run(f'''Given the following description of the technology "{tech.name}" and its impact since the year {tech.year}, provide your opinion on the technology and its impact. Do not provide any other commentary. Here is the description to use for your opinion: "{tech.blurb}"''')
+        response = table.update(record.id, {'optimist': optimist_response})
 
-    # if tech.pessimist is None:
-    #     pessimist_response = pessimist.run(f'''Given the following description of the technology "{tech.name}" and its impact since the year {tech.year}, provide your opinion on the technology and its impact. Do not provide any other commentary. Here is the description to use for your opinion: "{tech.blurb}"''')
-    #     response = table.update(record.id, {'pessimist': pessimist_response})
-    #     print(response)
+    if tech.pessimist is None:
+        pessimist_response = pessimist.run(f'''Given the following description of the technology "{tech.name}" and its impact since the year {tech.year}, provide your opinion on the technology and its impact. Do not provide any other commentary. Here is the description to use for your opinion: "{tech.blurb}"''')
+        response = table.update(record.id, {'pessimist': pessimist_response})
 
-    if tech.social_impact is None:
-        social_response = social_benefits.run(f'''Given the following description of the technology "{tech.name}" and its impact since the year {tech.year}, provide your opinion on the technology and its impact on social well-being and people's lives. Do not provide any other commentary. While you can consider all types of impacts, including potential off-shoot technologies, use only the actual impacts of the technology to make an assessment, do not hypothesize about potential impacts. While you should not use this description to color your assessment, I provide it as further context for you on the technology. This is the description of why the MIT Technology Review thought this technology would be a breakthrough: "{tech.blurb}"''')
-        social_impact_level = social_benefits.run(f'''Choose one of "High", "Medium", or "Low" to describe the actual social impact level of the technology {tech.name}. Do not provide any additional commentary, simply return one of those three words. Use this assessment of the actual impact to inform your decision: "{social_response}"''')
+    if tech.type is None:
+        type = general.run(f'''Pick one of "software", "hardware", "nanotech", "biotech", "climate/energy", or "other" to describe the type of technology "{tech.name}" is. 
+                            "Hardware" includes headphones, keyboards, pens, computer chips, etc.
+                            "Software" includes encryption, user interfaces, etc. 
+                           "Nanotech" includes quantum wires, nanopiezoelectronics, etc. 
+                           "Biotech" includes gene therapy, drugs, etc.  
+                           "Climate/Energy" includes carbon capture, solar panels, fusion reactors etc.
+                           Do not provide any other commentary, just return one of those five words. Here is the description to help you decide on a type for this technology: "{tech.blurb}"''')
+        response = table.update(record.id, {'type': type})
+        print('updated type for', tech.name, 'to', type)
 
-        social_impact_potential = social_benefits.run(f'''Given the following description of the technology "{tech.name}", provide your opinion on the technology and its potential impact on social well-being and people's lives. Do not provide any other commentary. While you can consider all types of impacts, including potential off-shoot technologies, ignore existing impacts and only hypothesize about potential impacts into the future from today onward. While you should not use this description to color your assessment, I provide it as further context for you on the technology. This is the description of why the MIT Technology Review thought this technology would be a breakthrough: "{tech.blurb}"''')
-        social_impact_potential_level = social_benefits.run(f'''Choose one of "High", "Medium", or "Low" to describe the potential social impact level of the technology {tech.name}. Do not provide any additional commentary, simply return one of those three words. Use this assessment of the potential impact to inform your decision: "{social_response}"''')
-        
-        response = table.update(record.id, {'social_impact': social_response, 'social_impact_level': social_impact_level, 'social_impact_potential': social_impact_potential, 'social_impact_potential_level': social_impact_potential_level})
-        print(response)
+    if tech.spi_impact is None:
+        if tech.social_impact is None:
+            social_response = social_benefits.run(f'''Given the following description of the technology "{tech.name}" and its impact since the year {tech.year}, provide your opinion on the technology and its impact on social well-being and people's lives. Do not provide any other commentary. While you can consider all types of impacts, including potential off-shoot technologies, use only the actual impacts of the technology to make an assessment, do not hypothesize about potential impacts. While you should not use this description to color your assessment, I provide it as further context for you on the technology. This is the description of why the MIT Technology Review thought this technology would be a breakthrough: "{tech.blurb}"''')
+            social_impact_level = social_benefits.run(f'''Choose one of "High", "Medium", or "Low" to describe the actual social impact level of the technology {tech.name}. Do not provide any additional commentary, simply return one of those three words. Use this assessment of the actual impact to inform your decision: "{social_response}"''')
+
+            social_impact_potential = social_benefits.run(f'''Given the following description of the technology "{tech.name}", provide your opinion on the technology and its potential impact on social well-being and people's lives. Do not provide any other commentary. While you can consider all types of impacts, including potential off-shoot technologies, ignore existing impacts and only hypothesize about potential impacts into the future from today onward. While you should not use this description to color your assessment, I provide it as further context for you on the technology. This is the description of why the MIT Technology Review thought this technology would be a breakthrough: "{tech.blurb}"''')
+            social_impact_potential_level = social_benefits.run(f'''Choose one of "High", "Medium", or "Low" to describe the potential social impact level of the technology {tech.name}. Do not provide any additional commentary, simply return one of those three words. Use this assessment of the potential impact to inform your decision: "{social_response}"''')
+        else:
+            social_response = tech.social_impact
+            social_impact_potential = tech.social_impact_potential
+            social_impact_level = tech.social_impact_level
+            social_impact_potential_level = tech.social_impact_potential_level
+            
+        spi_impact = social_benefits.run(f'''Given the following commentary on the technology "{tech.name}", provide your best guess at a % impact of this technology on the Social Progress Index since the year {tech.year} and over the next 20 years. 
+                                        Consider a range of possible % impacts over a single order of magnitude and provide a single number that you think is the most likely. 
+                                        Do not provide any other commentary. Just return a single % number. Remember that 1% means a 1% increase in the Social Progress Index can be attributed SOLELY to {tech.name}. So we expect the number to be small yet precise.
+                                        Here is the commentary to use for your decision: 
+                                        "{social_response}"
+                                        "{social_impact_potential}"
+                                        ''')
+        response = table.update(record.id, {'social_impact': social_response, 'social_impact_level': social_impact_level, 'social_impact_potential': social_impact_potential, 'social_impact_potential_level': social_impact_potential_level, 'spi_impact': spi_impact})
+        print('updated social for', tech.name)
+    print('time taken:', time.time() - start_time)
+
