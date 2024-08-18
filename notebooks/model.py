@@ -6,6 +6,27 @@ from typing import Any, Optional
 import ollama
 from pyairtable import Api
 
+gates_article = '''
+I was honored when MIT Technology Review invited me to be the first guest curator of its 10 Breakthrough Technologies. Narrowing down the list was difficult. I wanted to choose things that not only will create headlines in 2019 but captured this moment in technological history—which got me thinking about how innovation has evolved over time.
+
+⁠⁠My mind went to—of all things—the plow. Plows are an excellent embodiment of the history of innovation. Humans have been using them since 4000 BCE, when Mesopotamian farmers aerated soil with sharpened sticks. We’ve been slowly tinkering with and improving them ever since, and today’s plows are technological marvels.
+
+But what exactly is the purpose of a plow? It’s a tool that creates more: more seeds planted, more crops harvested, more food to go around. In places where nutrition is hard to come by, it’s no exaggeration to say that a plow gives people more years of life. The plow—like many technologies, both ancient and modern—is about creating more of something and doing it more efficiently, so that more people can benefit.⁠⁠
+
+Contrast that with lab-grown meat, one of the innovations I picked for this year’s 10 Breakthrough Technologies list. Growing animal protein in a lab isn’t about feeding more people. There’s enough livestock to feed the world already, even as demand for meat goes up. Next-generation protein isn’t about creating more—it’s about making meat better. It lets us provide for a growing and wealthier world without contributing to deforestation or emitting methane. It also allows us to enjoy hamburgers without killing any animals.
+
+⁠⁠Put another way, the plow improves our quantity of life, and lab-grown meat improves our quality of life. For most of human history, we’ve put most of our innovative capacity into the former. And our efforts have paid off: worldwide life expectancy rose from 34 years in 1913 to 60 in 1973 and has reached 71 today.⁠⁠
+
+⁠⁠Because we’re living longer, our focus is starting to shift toward well-being. This transformation is happening slowly. If you divide scientific breakthroughs into these two categories—things that improve quantity of life and things that improve quality of life—the 2009 list looks not so different from this year’s. Like most forms of progress, the change is so gradual that it’s hard to perceive. It’s a matter of decades, not years—and I believe we’re only at the midpoint of the transition.⁠⁠
+
+To be clear, I don’t think humanity will stop trying to extend life spans anytime soon. We’re still far from a world where everyone everywhere lives to old age in perfect health, and it’s going to take a lot of innovation to get us there. Plus, “quantity of life” and “quality of life” are not mutually exclusive. A malaria vaccine would both save lives and make life better for children who might otherwise have been left with developmental delays from the disease.
+
+We’ve reached a point where we’re tackling both ideas at once, and that’s what makes this moment in history so interesting. ⁠⁠If I had to predict what this list will look like a few years from now, I’d bet technologies that alleviate chronic disease will be a big theme. This won’t just include new drugs (although I would love to see new treatments for diseases like Alzheimer’s on the list). The innovations might look like a mechanical glove that helps a person with arthritis maintain flexibility, or an app that connects people experiencing major depressive episodes with the help they need.⁠⁠
+
+⁠⁠If we could look even further out—let’s say the list 20 years from now—I would hope to see technologies that center almost entirely on well-being. I think the brilliant minds of the future will focus on more metaphysical questions: How do we make people happier? How do we create meaningful connections? How do we help everyone live a fulfilling life?
+
+I would love to see these questions shape the 2039 list, because it would mean that we’ve successfully fought back disease (and dealt with climate change).⁠⁠ I can’t imagine a greater sign of progress than that. For now, though, the innovations driving change are a mix of things that extend life and things that make it better. My picks reflect both. Each one gives me a different reason to be optimistic for the future, and I hope they inspire you, too.
+'''
 
 class Model(Enum):
     phi3 = 'phi3:14b'
@@ -134,6 +155,7 @@ class Technology:
             self.social_impact_potential_level = fields.get('social_impact_potential_level')
             self.type = fields.get('type')
             self.spi_impact = fields.get('spi_impact')
+            self.quant_qual = fields.get('quant_qual')
 
 
     
@@ -214,15 +236,38 @@ for record in records:
             social_impact_potential = tech.social_impact_potential
             social_impact_level = tech.social_impact_level
             social_impact_potential_level = tech.social_impact_potential_level
-            
-        spi_impact = social_benefits.run(f'''Given the following commentary on the technology "{tech.name}", provide your best guess at a % impact of this technology on the Social Progress Index since the year {tech.year} and over the next 20 years. 
+        
+        if tech.spi_impact is None:
+            spi_impact = social_benefits.run(f'''Given the following commentary on the technology "{tech.name}", provide your best guess at a % impact of this technology on the Social Progress Index since the year {tech.year} and over the next 20 years. 
                                         Consider a range of possible % impacts over a single order of magnitude and provide a single number that you think is the most likely. 
-                                        Do not provide any other commentary. Just return a single % number. Remember that 1% means a 1% increase in the Social Progress Index can be attributed SOLELY to {tech.name}. So we expect the number to be small yet precise.
+                                        Do not provide any other commentary. Just return a single % number. Remember that 1% means a 1% increase in the Social Progress Index can be attributed SOLELY to {tech.name}. Negative % is also acceptable if the technology impact is expected to reduce the Social Progress Index and negatively impact society. So we expect the number to be small yet precise.
                                         Here is the commentary to use for your decision: 
                                         "{social_response}"
                                         "{social_impact_potential}"
                                         ''')
+        else:
+            spi_impact = tech.spi_impact
+
         response = table.update(record.id, {'social_impact': social_response, 'social_impact_level': social_impact_level, 'social_impact_potential': social_impact_potential, 'social_impact_potential_level': social_impact_potential_level, 'spi_impact': spi_impact})
         print('updated social for', tech.name)
+
+    if tech.quant_qual is None:
+        quant_qual = social_benefits.run(f'''
+                                 First, read this article by Bill Gates on the MIT Technology Review (TR) Breakthrough Technology picks that discusses "quantity of life" and "quality of life" as different ways technology can be impactful: "{gates_article}"
+
+                                 Next, read this description of a "{tech.name}", a Breakthrough Technology that TR picked in year {tech.year}: "{tech.blurb}"
+                                 
+                                 Now, using Bill Gates' article and description pick one of "quantity of life" or "quality of life" or "both" or "neither" to best describe "{tech.name}" impacts on society, humanity, and all living beings.
+
+                                 If there is a negative impact, you can consider whether that negative impact is a "quantity" or "quality" impact.
+
+                                 An example to consider: for climate technologies, can consider if the technology will help save lives ("quantity of life") or improve the quality of the lives that will remain ("quality of life"). Consider these types of thoughts when deciding between the four choices. "Both" and "neither" are also valid choices and can be seriously considered.
+
+                                Do not provide any other commentary, just return one of those these four tags: "quantity of life", "quality of life", "both", "neither". 
+                                ''')
+        
+        response = table.update(record.id, {'quant_qual': quant_qual})
+        print('updated quant_qual for', tech.name)
+
     print('time taken:', time.time() - start_time)
 
