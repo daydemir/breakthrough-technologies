@@ -51,7 +51,7 @@ class AgentInfo(Enum):
             FROM {Model.llama31.value}
             SYSTEM """{self._system_prompt()}"""
             PARAMETER temperature 0.3
-            PARAMETER num_ctx 81920
+            PARAMETER num_ctx 8192
             PARAMETER seed 42
         '''
 
