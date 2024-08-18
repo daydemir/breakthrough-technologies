@@ -51,7 +51,7 @@ class AgentInfo(Enum):
             FROM {Model.llama31.value}
             SYSTEM """{self._system_prompt()}"""
             PARAMETER temperature 0.3
-            PARAMETER num_ctx 8192
+            PARAMETER num_ctx 81920
             PARAMETER seed 42
         '''
 
@@ -141,7 +141,7 @@ class Technology:
             self.year = fields['year']
             # self.link = fields['link']
             # self.specific_link = fields['specific_link']
-            self.blurb = fields['blurb']
+            self.tr_text = fields['tr_text']
             self.summary = fields.get('summary')
             self.impact = fields.get('impact')
             self.author = fields.get('author')
@@ -156,15 +156,16 @@ class Technology:
             self.type = fields.get('type')
             self.spi_impact = fields.get('spi_impact')
             self.quant_qual = fields.get('quant_qual')
+            self.flop_type = fields.get('flop_type')
 
 
     
     def summarize(self, agent: Agent) -> str:
-        summary = agent.run(f'''Here is the article to summarize about {self.name} from the year {self.year}: "{self.blurb}"''')
+        summary = agent.run(f'''Here is the article to summarize about {self.name} from the year {self.year}: "{self.tr_text}"''')
         return summary
 
     def fulfillment(self, agent: Agent) -> str:
-        return agent.run(f'''Given the following description of the technology "{self.name}" and its impact since the year {self.year}, pick one of the following words to describe its success "Low Impact", "Medium Impact", "High Impact". Only return one of those, do not provide any other commentary. Here is the description to use for your decision: "{self.blurb}"''')
+        return agent.run(f'''Given the following description of the technology "{self.name}" and its impact since the year {self.year}, pick one of the following words to describe its success "Low Impact", "Medium Impact", "High Impact". Only return one of those, do not provide any other commentary. Here is the description to use for your decision: "{self.tr_text}"''')
 
 
 def summarize(technology: Technology, summarizer: Agent, cleaner: Agent) -> tuple[str, str, str, str]:
@@ -177,7 +178,13 @@ def summarize(technology: Technology, summarizer: Agent, cleaner: Agent) -> tupl
 
 
 
-token = 'patphUJScafduJmpI.d2549138065af741d38c396bdc189948b1a18503df821a0cd78765fc1d576dcf'
+
+import os
+
+from dotenv import load_dotenv
+
+load_dotenv()
+token = os.getenv('AIRTABLE_TOKEN') # get your token from online and then put it into the .env file as "AIRTABLE_TOKEN=your_token_here"
 api = Api(api_key=token)
 table = api.table('appOHJEmEMgO9CV6X', 'tblPEUr3QOpPlxIYY')
 
@@ -206,11 +213,11 @@ for record in records:
         response = table.update(record.id, {'impact_level': impact_level})
 
     if tech.optimist is None:
-        optimist_response = optimist.run(f'''Given the following description of the technology "{tech.name}" and its impact since the year {tech.year}, provide your opinion on the technology and its impact. Do not provide any other commentary. Here is the description to use for your opinion: "{tech.blurb}"''')
+        optimist_response = optimist.run(f'''Given the following description of the technology "{tech.name}" and its impact since the year {tech.year}, provide your opinion on the technology and its impact. Do not provide any other commentary. Here is the description to use for your opinion: "{tech.tr_text}"''')
         response = table.update(record.id, {'optimist': optimist_response})
 
     if tech.pessimist is None:
-        pessimist_response = pessimist.run(f'''Given the following description of the technology "{tech.name}" and its impact since the year {tech.year}, provide your opinion on the technology and its impact. Do not provide any other commentary. Here is the description to use for your opinion: "{tech.blurb}"''')
+        pessimist_response = pessimist.run(f'''Given the following description of the technology "{tech.name}" and its impact since the year {tech.year}, provide your opinion on the technology and its impact. Do not provide any other commentary. Here is the description to use for your opinion: "{tech.tr_text}"''')
         response = table.update(record.id, {'pessimist': pessimist_response})
 
     if tech.type is None:
@@ -220,16 +227,16 @@ for record in records:
                            "Nanotech" includes quantum wires, nanopiezoelectronics, etc. 
                            "Biotech" includes gene therapy, drugs, etc.  
                            "Climate/Energy" includes carbon capture, solar panels, fusion reactors etc.
-                           Do not provide any other commentary, just return one of those five words. Here is the description to help you decide on a type for this technology: "{tech.blurb}"''')
+                           Do not provide any other commentary, just return one of those five words. Here is the description to help you decide on a type for this technology: "{tech.tr_text}"''')
         response = table.update(record.id, {'type': type})
         print('updated type for', tech.name, 'to', type)
 
     if tech.spi_impact is None:
         if tech.social_impact is None:
-            social_response = social_benefits.run(f'''Given the following description of the technology "{tech.name}" and its impact since the year {tech.year}, provide your opinion on the technology and its impact on social well-being and people's lives. Do not provide any other commentary. While you can consider all types of impacts, including potential off-shoot technologies, use only the actual impacts of the technology to make an assessment, do not hypothesize about potential impacts. While you should not use this description to color your assessment, I provide it as further context for you on the technology. This is the description of why the MIT Technology Review thought this technology would be a breakthrough: "{tech.blurb}"''')
+            social_response = social_benefits.run(f'''Given the following description of the technology "{tech.name}" and its impact since the year {tech.year}, provide your opinion on the technology and its impact on social well-being and people's lives. Do not provide any other commentary. While you can consider all types of impacts, including potential off-shoot technologies, use only the actual impacts of the technology to make an assessment, do not hypothesize about potential impacts. While you should not use this description to color your assessment, I provide it as further context for you on the technology. This is the description of why the MIT Technology Review thought this technology would be a breakthrough: "{tech.tr_text}"''')
             social_impact_level = social_benefits.run(f'''Choose one of "High", "Medium", or "Low" to describe the actual social impact level of the technology {tech.name}. Do not provide any additional commentary, simply return one of those three words. Use this assessment of the actual impact to inform your decision: "{social_response}"''')
 
-            social_impact_potential = social_benefits.run(f'''Given the following description of the technology "{tech.name}", provide your opinion on the technology and its potential impact on social well-being and people's lives. Do not provide any other commentary. While you can consider all types of impacts, including potential off-shoot technologies, ignore existing impacts and only hypothesize about potential impacts into the future from today onward. While you should not use this description to color your assessment, I provide it as further context for you on the technology. This is the description of why the MIT Technology Review thought this technology would be a breakthrough: "{tech.blurb}"''')
+            social_impact_potential = social_benefits.run(f'''Given the following description of the technology "{tech.name}", provide your opinion on the technology and its potential impact on social well-being and people's lives. Do not provide any other commentary. While you can consider all types of impacts, including potential off-shoot technologies, ignore existing impacts and only hypothesize about potential impacts into the future from today onward. While you should not use this description to color your assessment, I provide it as further context for you on the technology. This is the description of why the MIT Technology Review thought this technology would be a breakthrough: "{tech.tr_text}"''')
             social_impact_potential_level = social_benefits.run(f'''Choose one of "High", "Medium", or "Low" to describe the potential social impact level of the technology {tech.name}. Do not provide any additional commentary, simply return one of those three words. Use this assessment of the potential impact to inform your decision: "{social_response}"''')
         else:
             social_response = tech.social_impact
@@ -255,7 +262,7 @@ for record in records:
         quant_qual = social_benefits.run(f'''
                                  First, read this article by Bill Gates on the MIT Technology Review (TR) Breakthrough Technology picks that discusses "quantity of life" and "quality of life" as different ways technology can be impactful: "{gates_article}"
 
-                                 Next, read this description of a "{tech.name}", a Breakthrough Technology that TR picked in year {tech.year}: "{tech.blurb}"
+                                 Next, read this description of a "{tech.name}", a Breakthrough Technology that TR picked in year {tech.year}: "{tech.tr_text}"
                                  
                                  Now, using Bill Gates' article and description pick one of "quantity of life" or "quality of life" or "both" or "neither" to best describe "{tech.name}" impacts on society, humanity, and all living beings.
 
@@ -268,6 +275,51 @@ for record in records:
         
         response = table.update(record.id, {'quant_qual': quant_qual})
         print('updated quant_qual for', tech.name)
+
+    if tech.flop_type is None:
+        flop_type = general.run(f'''
+                                I'm going to give you a bunch of thoughts about the technology {tech.name}:
+                                The article written by the MIT Technology Review in {tech.year} about why this technology will be a breakthrough: "{tech.tr_text}"
+                                Next, here are some opinions on the social impact that this technology has had and may have in the future.
+                                The actual social impact of the technology: "{tech.social_impact}"
+                                The potential social impact of the technology: "{tech.social_impact_potential}"
+                                The very rough estimation impact on the Social Progress Index: "{tech.spi_impact}"
+
+                                Next, here are some opinions on the technology and whether it is actually a breakthrough.
+                                The optimist's opinion: "{tech.optimist}"
+                                The pessimist's opinion: "{tech.pessimist}"
+                                The general opinion on the impact level of the technology: "{tech.impact}
+                                An opinion on the success of the claim that this technology will be a breakthrough: "{tech.opinion}"   
+
+                                Here is a general opinion by Bill Gates' on a way to measure the success of a technology: "{gates_article}"
+
+                                Finally, you should be aware that we care about understanding whether the technology actually became a breakthrough like the MIT Technology Review claimed it would. 
+                                
+                                Respond in the following format:
+                                [result]: [50-100 words on why you chose that result]
+                                the [result] should be exactly one of the following: 
+                                "1. Successful",
+                                "2. Partially Successful", 
+                                "3. Unsuccessful (unable to transition from research to widespread use)",
+                                "4. Unsuccessful (underlying technology platform changed)",
+                                "5. Unsuccessful (too early to tell)"
+                                "6. Unsuccessful (not enough adoption)"
+
+                                example of 1 would be "machine learning" because it has had a huge impact on society and will likely have a huge impact on human well being
+                                example of 2 would be "cloud streaming" because while it has been impactful, it may not have had as huge an impact on human well-being compared to other technologies
+                                example of 3 would be "quantum computing" because it has not yet transitioned from research to widespread use
+                                example of 4 would be "Cell Phone Virus" because the underlying technology platform has changed and the technology did not have as much impact before the technology landscape changed
+                                example of 5 would be "Carbon Removal Factory in Iceland" because it is too early to tell if it will have a huge impact on society's well-being
+                                example of 6 would be "Babel-Fish Earbuds" because the technology has not been widely adopted, or adopted enough for it to be considered a significant enough impact on human well-being
+
+                                Remember, a technology is a breakthrough if it has a significant impact on society and human well-being. This can be thought of as GDP-B, the Social Progress Index, or other measures of human well-being. But use that as your main criteria which result you choose.
+
+                                Overall, be critical and discerning, with an eye for scientific accuracy. Do not assume technologies are all impactful, but do not be excessively critical either. Consider evidence and mention it briefly in your justification following the [result].
+                                
+                                Respond exactly in the format above, do not provide any other commentary.
+                                ''')
+        response = table.update(record.id, {'flop_type': flop_type})
+        print('updated flop_type for', tech.name)
 
     print('time taken:', time.time() - start_time)
 
